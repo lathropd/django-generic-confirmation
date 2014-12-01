@@ -1,5 +1,7 @@
 from django.utils import timezone
 from django.db import models
+from django.core.files.uploadedfile  import SimpleUploadedFile
+
 from django.db.models.query import Q
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
@@ -12,13 +14,11 @@ class ConfirmationManager(models.Manager):
             action = self.exclude(confirmed=True).get(token=token)
         except self.model.DoesNotExist:
             return False
-
         if not action.is_expired():
             obj = action.resume_form_save()
             action.confirmed = True
             action.save() # FIXME: should we delete() here?
             return obj
-
         return False
 
     def pending_for(self, instance):
@@ -36,6 +36,7 @@ class DeferredAction(models.Model):
 
     form_class = models.CharField(max_length=255)
     form_input = PickledObjectField(editable=False)
+    form_files = PickledObjectField(editable=False, blank=True)
 
     content_type = models.ForeignKey(ContentType, null=True)
     object_pk = models.TextField(null=True)
@@ -51,10 +52,19 @@ class DeferredAction(models.Model):
         form_module = __import__(module, {}, {}, [''])
         form_class = getattr(form_module, klass)
 
+        form_files = {}
+        for key, val in self.form_files.iteritems():
+            # print key, val
+            # if hasattr( val, 'name') and hasattr( val, 'content'):
+            form_files[key] = SimpleUploadedFile(val.get('name'),
+                val.get('content'),
+                val.get('content_type','text/plain'))
+        print form_files
+
         if self.instance_object is None:
-            form = form_class(self.form_input)
+            form = form_class(self.form_input, form_files)
         else:
-            form = form_class(self.form_input, instance=self.instance_object)
+            form = form_class(self.form_input, form_file, instance=self.instance_object)
 
         if not form.is_valid():
             raise Exception("the defered form was not cleaned properly before saving")
