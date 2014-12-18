@@ -64,7 +64,7 @@ class DeferredAction(models.Model):
         if self.instance_object is None:
             form = form_class(self.form_input, form_files)
         else:
-            form = form_class(self.form_input, form_file, instance=self.instance_object)
+            form = form_class(self.form_input, form_files, instance=self.instance_object)
 
         if not form.is_valid():
             raise Exception("the defered form was not cleaned properly before saving")
